@@ -1,0 +1,49 @@
+name: build-wasm
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: latest
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          rustc --version 2>&1 | tee build.log
+          RUSTFLAGS='--cfg getrandom_backend="wasm_js"' wasm-pack build web --target no-modules --release --out-dir ../dist --out-name sparrow_web 2>&1 | tee -a build.log
+      - name: Publish build output to the build-output branch
+        if: always()
+        run: |
+          mkdir -p out
+          cp build.log out/ 2>/dev/null || true
+          cp dist/sparrow_web.js dist/sparrow_web_bg.wasm out/ 2>/dev/null || true
+          ls -la out > out/listing.txt
+          cd out
+          git init -q
+          git checkout -q -b build-output
+          git config user.name "build-bot"
+          git config user.email "build-bot@users.noreply.github.com"
+          git add -A
+          git commit -q -m "build output for ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" build-output
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sparrow-wasm
+          path: |
+            dist/sparrow_web.js
+            dist/sparrow_web_bg.wasm
+            build.log
