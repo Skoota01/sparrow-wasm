@@ -1,0 +1,7 @@
+total 1056
+drwxr-xr-x 2 runner runner    4096 Oct 19 10:56 .
+drwxr-xr-x 9 runner runner    4096 Oct 19 10:56 ..
+-rw-r--r-- 1 runner runner    5216 Oct 19 10:56 build.log
+-rw-r--r-- 1 runner runner       0 Oct 19 10:56 listing.txt
+-rw-r--r-- 1 runner runner   12588 Oct 19 10:56 sparrow_web.js
+-rw-r--r-- 1 runner runner 1046567 Oct 19 10:56 sparrow_web_bg.wasm
