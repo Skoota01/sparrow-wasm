@@ -5,7 +5,7 @@
 //! is spent, so call it from a Web Worker.
 use jagua_rs::io::import::Importer;
 use jagua_rs::probs::spp::entities::SPSolution;
-use jagua_rs::probs::spp::io::ext_repr::ExtSPInstance;
+use jagua_rs::probs::spp::io::ext_repr::{ExtSPInstance, ExtSPSolution};
 use rand::SeedableRng;
 use rand::rngs::Xoshiro256PlusPlus;
 use sparrow::EPOCH;
@@ -54,13 +54,14 @@ impl SolutionListener for JsListener {
 }
 
 /// Runs Sparrow. `time_secs` is the total budget (split between exploration and compression).
-/// `progress(kind, stripWidth, solutionJson)` is called when a better feasible layout is found.
+/// `init_json` is an optional starting layout. `progress(kind, stripWidth, solutionJson)` is called when a better feasible layout is found.
 #[wasm_bindgen]
 pub fn solve(
     instance_json: &str,
     time_secs: f64,
     seed: u32,
     workers: u32,
+    init_json: Option<String>,
     progress: Option<js_sys::Function>,
 ) -> Result<String, JsValue> {
     console_error_panic_hook::set_once();
@@ -82,6 +83,15 @@ pub fn solve(
     let importer = Importer::new(config.cde_config, config.poly_simpl_tolerance, config.narrow_concavity_cutoff_ratio);
     let instance = jagua_rs::probs::spp::io::import_instance(&importer, &ext).map_err(|e| err(format!("import failed: {e:?}")))?;
 
+    // Optional warm start: a layout (same JSON the solver returns) to improve on.
+    let initial = match init_json.filter(|t| !t.trim().is_empty()) {
+        Some(t) => {
+            let ext_sol: ExtSPSolution = serde_json::from_str(&t).map_err(|e| err(format!("bad start layout: {e}")))?;
+            Some(jagua_rs::probs::spp::io::import_solution(&instance, &ext_sol).map_err(|e| err(format!("start layout rejected: {e:?}")))?)
+        }
+        None => None,
+    };
+
     let mut listener = JsListener { cb: progress };
     let mut terminator = BasicTerminator::new();
     let solution = optimize(
@@ -91,7 +101,7 @@ pub fn solve(
         &mut terminator,
         &config.expl_cfg,
         &config.cmpr_cfg,
-        None,
+        initial.as_ref(),
     )
     .map_err(|e| err(format!("optimize failed: {e:?}")))?;
 
